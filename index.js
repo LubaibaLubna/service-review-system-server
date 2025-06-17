@@ -1,5 +1,3 @@
-
-
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
@@ -28,10 +26,65 @@ async function run() {
     const servicesCollection = client.db('serviceDB').collection('services');
     const reviewsCollection = client.db('serviceDB').collection('reviews');
 
-    // SERVICES ROUTES
+    // 1. Enhanced services GET route with search & filter
     app.get('/services', async (req, res) => {
-      const result = await servicesCollection.find().toArray();
-      res.send(result);
+      try {
+        const { search, category } = req.query;
+        const query = {};
+
+        if (search) {
+          // Search across title, category, company fields case-insensitive
+          const searchRegex = new RegExp(search, 'i');
+          query.$or = [
+            { title: searchRegex },
+            { category: searchRegex },
+            { company: searchRegex },
+            { description: searchRegex },
+          ];
+        }
+
+        if (category && category !== 'All') {
+          query.category = category;
+        }
+
+        const services = await servicesCollection.find(query).toArray();
+        res.send(services);
+      } catch (err) {
+        console.error(err);
+        res.status(500).send({ message: 'Server Error' });
+      }
+    });
+
+    // 2. Route to get unique, case-insensitive Categories
+    app.get('/categories', async (req, res) => {
+      try {
+        const categories = await servicesCollection.aggregate([
+          { $group: { _id: { $toLower: "$category" } } },
+          { $project: { _id: 0, category: "$_id" } }
+        ]).toArray();
+
+        res.send(categories.map(item => item.category)); // return array of lower-cased Categories
+      } catch (err) {
+        console.error(err);
+        res.status(500).send({ message: 'Server Error' });
+      }
+    });
+
+    // 3. Route to get counts of services, users, reviews
+    app.get('/counts', async (req, res) => {
+      try {
+        const servicesCount = await servicesCollection.countDocuments();
+        const reviewsCount = await reviewsCollection.countDocuments();
+
+        // Assuming you have a users collection, otherwise return 0
+        const usersCollection = client.db('serviceDB').collection('users');
+        const usersCount = await usersCollection.countDocuments();
+
+        res.send({ servicesCount, reviewsCount, usersCount });
+      } catch (err) {
+        console.error(err);
+        res.status(500).send({ message: 'Server Error' });
+      }
     });
 
     app.get('/my-services', async (req, res) => {
@@ -148,18 +201,3 @@ app.get("/", (req, res) => {
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
