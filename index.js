@@ -95,6 +95,19 @@ async function run() {
       }
     });
 
+    
+         // Get 6 featured services for homepage
+app.get('/services/featured', async (req, res) => {
+  try {
+    const featuredServices = await servicesCollection.find().limit(6).toArray();
+    res.send(featuredServices);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send({ message: 'Server Error' });
+  }
+});
+
+
     //  Get service by id
     app.get('/services/:id', async (req, res) => {
       const id = req.params.id;
