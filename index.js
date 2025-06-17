@@ -6,7 +6,7 @@ const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const app = express();
 const port = process.env.PORT || 3000;
 
-app.use(cors()); // Allow requests from frontend
+app.use(cors()); 
 app.use(express.json());
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.8holrnh.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
@@ -25,28 +25,25 @@ async function run() {
 
     const servicesCollection = client.db('serviceDB').collection('services');
     const reviewsCollection = client.db('serviceDB').collection('reviews');
-
-    // 1. Enhanced services GET route with search & filter
+    const usersCollection = client.db('serviceDB').collection('users'); 
+    //  GET services with search and filter
     app.get('/services', async (req, res) => {
       try {
         const { search, category } = req.query;
         const query = {};
 
         if (search) {
-          // Search across title, category, company fields case-insensitive
-          const searchRegex = new RegExp(search, 'i');
+          const searchRegex = new RegExp(search, 'i'); 
           query.$or = [
             { title: searchRegex },
             { category: searchRegex },
             { company: searchRegex },
-            { description: searchRegex },
+            { description: searchRegex }
           ];
         }
-
         if (category && category !== 'All') {
           query.category = category;
         }
-
         const services = await servicesCollection.find(query).toArray();
         res.send(services);
       } catch (err) {
@@ -55,31 +52,28 @@ async function run() {
       }
     });
 
-    // 2. Route to get unique, case-insensitive Categories
+    //  Route to get all Categories
     app.get('/categories', async (req, res) => {
       try {
-        const categories = await servicesCollection.aggregate([
-          { $group: { _id: { $toLower: "$category" } } },
-          { $project: { _id: 0, category: "$_id" } }
-        ]).toArray();
-
-        res.send(categories.map(item => item.category)); // return array of lower-cased Categories
+        const categories = await servicesCollection.distinct('category');
+        res.send(categories);
       } catch (err) {
         console.error(err);
         res.status(500).send({ message: 'Server Error' });
       }
     });
 
-    // 3. Route to get counts of services, users, reviews
+    //  Route to get service, reviews, and users count
     app.get('/counts', async (req, res) => {
       try {
         const servicesCount = await servicesCollection.countDocuments();
         const reviewsCount = await reviewsCollection.countDocuments();
 
-        // Assuming you have a users collection, otherwise return 0
-        const usersCollection = client.db('serviceDB').collection('users');
-        const usersCount = await usersCollection.countDocuments();
-
+        let usersCount = 0;
+        if (usersCollection) {
+          usersCount = await usersCollection.countDocuments();
+        }
+        
         res.send({ servicesCount, reviewsCount, usersCount });
       } catch (err) {
         console.error(err);
@@ -87,13 +81,21 @@ async function run() {
       }
     });
 
+    //  Route to get services by email
     app.get('/my-services', async (req, res) => {
       const email = req.query.email;
       if (!email) return res.status(400).send({ message: "Email is required" });
-      const result = await servicesCollection.find({ email }).toArray();
-      res.send(result);
+
+      try {
+        const result = await servicesCollection.find({ email }).toArray();
+        res.send(result);
+      } catch (err) {
+        res.status(500).send({ message: "Server Error" });
+        console.error(err);
+      }
     });
 
+    //  Get service by id
     app.get('/services/:id', async (req, res) => {
       const id = req.params.id;
       try {
@@ -109,12 +111,14 @@ async function run() {
       }
     });
 
+    //  Post service
     app.post('/services', async (req, res) => {
       const newService = req.body;
       const result = await servicesCollection.insertOne(newService);
       res.send(result);
     });
 
+    //  Update service
     app.put('/my-services/:id', async (req, res) => {
       const id = req.params.id;
       const updated = req.body;
@@ -123,20 +127,27 @@ async function run() {
       res.send(result);
     });
 
+    //  Delete service
     app.delete('/my-services/:id', async (req, res) => {
       const id = req.params.id;
       const result = await servicesCollection.deleteOne({ _id: new ObjectId(id) });
       res.send(result);
     });
 
-    // REVIEWS ROUTES
+    // ===== REVIEWS =====
 
-    // Get reviews by serviceId
+    //  Get reviews by serviceId
     app.get('/reviews', async (req, res) => {
       const serviceId = req.query.serviceId;
       if (!serviceId) return res.status(400).send({ message: "serviceId is required" });
-      const reviews = await reviewsCollection.find({ serviceId }).toArray();
-      res.send(reviews);
+
+      try {
+        const reviews = await reviewsCollection.find({ serviceId }).toArray();
+        res.send(reviews);
+      } catch (err) {
+        res.status(500).send({ message: "Server Error" });
+        console.error(err);
+      }
     });
 
     // Get reviews by user email
@@ -151,14 +162,14 @@ async function run() {
       }
     });
 
-    // Add new review
+    //  Post a new review
     app.post('/reviews', async (req, res) => {
       const newReview = req.body;
       const result = await reviewsCollection.insertOne(newReview);
       res.send(result);
     });
 
-    // Update review by ID
+    //  Update a review
     app.put('/reviews/:id', async (req, res) => {
       const id = req.params.id;
       const { text, rating } = req.body;
@@ -173,7 +184,7 @@ async function run() {
       }
     });
 
-    // Delete review by ID
+    //  Delete a review
     app.delete('/reviews/:id', async (req, res) => {
       const id = req.params.id;
       try {
