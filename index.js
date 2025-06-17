@@ -26,32 +26,33 @@ async function run() {
     const servicesCollection = client.db('serviceDB').collection('services');
     const reviewsCollection = client.db('serviceDB').collection('reviews');
     const usersCollection = client.db('serviceDB').collection('users'); 
-    //  GET services with search and filter
-    app.get('/services', async (req, res) => {
-      try {
-        const { search, category } = req.query;
-        const query = {};
+    
+app.get('/services', async (req, res) => {
+  try {
+    const { search, category } = req.query;
+    const query = {};
 
-        if (search) {
-          const searchRegex = new RegExp(search, 'i'); 
-          query.$or = [
-            { title: searchRegex },
-            { category: searchRegex },
-            { company: searchRegex },
-            { description: searchRegex }
-          ];
-        }
-        if (category && category !== 'All') {
-          query.category = category;
-        }
-        const services = await servicesCollection.find(query).toArray();
-        res.send(services);
-      } catch (err) {
-        console.error(err);
-        res.status(500).send({ message: 'Server Error' });
-      }
-    });
+    if (search) {
+      const searchRegex = new RegExp(search, 'i'); 
+      query.$or = [
+        { title: searchRegex },
+        { company: searchRegex },
+        { category: searchRegex },
+        { description: searchRegex }
+      ];
+    }
 
+    if (category && category !== 'All') {
+      query.category = category;
+    }
+
+    const services = await servicesCollection.find(query).toArray(); // optionally add .limit(50)
+    res.send(services);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send({ message: 'Server Error' });
+  }
+});
     //  Route to get all Categories
     app.get('/categories', async (req, res) => {
       try {
